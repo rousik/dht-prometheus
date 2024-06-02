@@ -10,6 +10,8 @@ python = "^3.10"
 prometheus-client = "^0.20.0"
 adafruit-circuitpython-dht = "^4.0.4"
 
+[tool.poetry.scripts]
+collector = "dht_prometheus.main:main"
 
 [build-system]
 requires = ["poetry-core"]
