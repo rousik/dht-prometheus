@@ -4,7 +4,7 @@ This is lightweight software stack for collecting variety of environmental data 
 
 ## Hardware wiring
 
-'m using DHT22 sensor for temperature and humidity, and MH-Z19 for CO2 monitoring.
+I'm using DHT22 sensor for temperature and humidity, and MH-Z19 for CO2 monitoring.
 
 The default values in the code assume the following wiring:
 * DHT-22 - connected to pins 1 (3v), 7 (GPIO 7) and 9 (Gnd).
