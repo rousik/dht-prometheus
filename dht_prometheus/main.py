@@ -1,6 +1,4 @@
 import time
-
-import time
 import struct
 import serial
 import adafruit_dht
@@ -100,6 +98,8 @@ def main():
     iteration = 0
     consecutive_fails = 0
     while True:
+        if iteration > 0:
+            time.sleep(1.0)
         iteration += 1
         print(f"{iteration}: Reading sensor values")
         UPTIME.set(time.time() - start_time)
@@ -110,9 +110,11 @@ def main():
         else:
             consecutive_fails += 1
 
-        if consecutive_fails > = MAX_CONSECUTIVE_FAILS:
+        if consecutive_fails >= MAX_CONSECUTIVE_FAILS:
             print(f"Failed too many reads in row, aborting after {iteration} iterations.")
             break
+
+
 
 
 if __name__ == "__main__":
