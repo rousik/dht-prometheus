@@ -11,7 +11,7 @@ UPTIME = Gauge("uptime", "Service uptime in seconds")
 MAX_CONSECUTIVE_FAILS = 10
 
 class TempAndHumiditySensor:
-    def __init__(self, pin=board.D7, sensor_name=""):
+    def __init__(self, pin=board.D4, sensor_name=""): # d4 is GPIO4, pin 7
         self._device = adafruit_dht.DHT22(pin)
         self._temp_c = Gauge(sensor_name + "temperature_c", "Temperature in Celsius")
         self._temp_f = Gauge(sensor_name + "temperature_f", "Temperature in Fahrenheit")
@@ -29,8 +29,10 @@ class TempAndHumiditySensor:
             self._temp_f.set(temp_c * 1.8 + 32)
             self._humidity.set(humidity)
             return True
-        except RuntimeError as error:
-            self._read_erors.inc()
+        except Exception as err:
+            print("Failure when reading dht22 sensor")
+            print(err)
+            self._read_errors.inc()
             return False
 
 
@@ -80,8 +82,10 @@ class CarbonSensor:
                 self._co2_concentration.set(co2_ppm)
                 return True
             else:
+                print("Failed to read from dht22 sensor")
                 self._read_errors.inc()
         except RuntimeError as error:
+            print(f"Exception when reading from dht22: {error}")
             self._read_errors.inc()
         return False
 
@@ -90,11 +94,14 @@ def main():
     start_http_server(8000)
     # TODO(rousik): add options for different wiring and for multiple sensors.
     start_time = time.time()
-    dht22 = TempAndHumiditySensor()
+    dht22 = TempAndHumiditySensor(pin=board.D2)
     mhz19 = CarbonSensor()
 
+    iteration = 0
     consecutive_fails = 0
     while True:
+        iteration += 1
+        print(f"{iteration}: Reading sensor values")
         UPTIME.set(time.time() - start_time)
         ok1 = dht22.refresh()
         ok2 = mhz19.refresh()
@@ -104,10 +111,8 @@ def main():
             consecutive_fails += 1
 
         if consecutive_fails > = MAX_CONSECUTIVE_FAILS:
-            print("Failed too many reads in row, aborting.")
+            print(f"Failed too many reads in row, aborting after {iteration} iterations.")
             break
-
-        time.sleep(1.0)
 
 
 if __name__ == "__main__":
