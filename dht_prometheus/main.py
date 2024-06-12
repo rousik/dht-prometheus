@@ -1,11 +1,14 @@
 import time
 
+import time
 import struct
 import serial
 import adafruit_dht
 import board
 from prometheus_client import Counter, Gauge, start_http_server
 
+UPTIME = Gauge("uptime", "Service uptime in seconds")
+MAX_CONSECUTIVE_FAILS = 10
 
 class TempAndHumiditySensor:
     def __init__(self, pin=board.D7, sensor_name=""):
@@ -13,11 +16,13 @@ class TempAndHumiditySensor:
         self._temp_c = Gauge(sensor_name + "temperature_c", "Temperature in Celsius")
         self._temp_f = Gauge(sensor_name + "temperature_f", "Temperature in Fahrenheit")
         self._humidity = Gauge(sensor_name + "humidity", "Relative humidity in %")
+        self._reads = Counter(sensor_name + "dht22_reads", "Number of sensor reads")
         self._read_errors = Counter(sensor_name + "dht22_read_errors", "Number of errors while reading the sensor value")
 
     def refresh(self) -> bool:
         """Refreshes the sensor values; returns True upon success, False if the operation failed."""
         try:
+            self._reads.inc()
             temp_c = self._device.temperature
             humidity = self._device.humidity
             self._temp_c.set(temp_c)
@@ -43,6 +48,7 @@ class CarbonSensor:
             timeout=1.0
         )
         self._co2_concentration = Gauge("co2_ppm", "CO2 ppm concenctration")
+        self._reads = Counter("mh_z19_reads", "Number of sensor reads")
         self._read_errors = Counter("mh_z19_read_errors", "Read errors for the co2 mh-z19 sensor")
 
 
@@ -63,29 +69,44 @@ class CarbonSensor:
             print(f"I may have gotten the checksum logic wrong! {cs} {cs_valid}")
             return False
 
-    def refresh(self):
+    def refresh(self) -> bool:
         # TODO(rousik): retry this few times if needed.
         try:
+            self._reads.inc()
             self._serial.write(b"\xff\x01\x86\x00\x00\x00\x00\x00\x79")
             result = self._serial.read(9)
             if self._valid_response(result):
                 co2_ppm = result[2]*256 + result[3]
                 self._co2_concentration.set(co2_ppm)
+                return True
             else:
                 self._read_errors.inc()
         except RuntimeError as error:
             self._read_errors.inc()
+        return False
 
     
 def main():
     start_http_server(8000)
     # TODO(rousik): add options for different wiring and for multiple sensors.
+    start_time = time.time()
     dht22 = TempAndHumiditySensor()
     mhz19 = CarbonSensor()
 
+    consecutive_fails = 0
     while True:
-        dht22.refresh()
-        mhz19.refresh()
+        UPTIME.set(time.time() - start_time)
+        ok1 = dht22.refresh()
+        ok2 = mhz19.refresh()
+        if ok1 and ok2:
+            consecutive_fails = 0
+        else:
+            consecutive_fails += 1
+
+        if consecutive_fails > = MAX_CONSECUTIVE_FAILS:
+            print("Failed too many reads in row, aborting.")
+            break
+
         time.sleep(1.0)
 
 
